@@ -1,13 +1,7 @@
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::os::raw::{c_char, c_int, c_double};
+use std::os::raw::{c_char, c_double, c_int};
 use std::path;
-
-extern crate cairo;
-
-extern crate cairo_sys;
-extern crate glib;
-extern crate glib_sys;
 
 mod ffi;
 mod util;
@@ -41,7 +35,7 @@ impl PopplerDocument {
         data: &mut [u8],
         password: &str,
     ) -> Result<PopplerDocument, glib::error::Error> {
-        if data.len() == 0 {
+        if data.is_empty() {
             return Err(glib::error::Error::new(
                 glib::FileError::Inval,
                 "data is empty",
@@ -149,14 +143,12 @@ impl PopplerPage {
 
 #[cfg(test)]
 mod tests {
-    use cairo::Format;
-    use cairo::prelude::SurfaceExt;
-    use cairo::Context;
-    use cairo::ImageSurface;
-    use cairo::pdf;
-    use std::{fs::File, io::Read};
     use crate::PopplerDocument;
     use crate::PopplerPage;
+    use cairo::Context;
+    use cairo::Format;
+    use cairo::ImageSurface;
+    use std::{fs::File, io::Read};
 
     #[test]
     fn test1() {
@@ -166,23 +158,23 @@ mod tests {
 
         println!("Document has {} page(s)", num_pages);
 
-        let mut surface = pdf::File::new(420.0, 595.0, "output.pdf");
-        let ctx = Context::new(&mut surface);
+        let surface = cairo::PdfSurface::new(420.0, 595.0, "output.pdf").unwrap();
+        let ctx = Context::new(&surface).unwrap();
 
         // FIXME: move iterator to poppler
         for page_num in 0..num_pages {
             let page = doc.get_page(page_num).unwrap();
             let (w, h) = page.get_size();
             println!("page {} has size {}, {}", page_num, w, h);
-            surface.set_size(w, h);
+            surface.set_size(w, h).unwrap();
 
-            ctx.save();
+            ctx.save().unwrap();
             page.render(&ctx);
 
             println!("Text: {:?}", page.get_text().unwrap_or(""));
 
-            ctx.restore();
-            ctx.show_page();
+            ctx.restore().unwrap();
+            ctx.show_page().unwrap();
         }
         // g_object_unref (page);
         //surface.write_to_png("file.png");
@@ -216,13 +208,13 @@ mod tests {
 
         assert_eq!(title, "This is a test PDF file");
 
-        let mut surface = ImageSurface::create(Format::ARgb32, w as i32, h as i32).unwrap();
-        let ctx = Context::new(&mut surface);
+        let surface = ImageSurface::create(Format::ARgb32, w as i32, h as i32).unwrap();
+        let ctx = Context::new(&surface).unwrap();
 
-        ctx.save();
+        ctx.save().unwrap();
         page.render(&ctx);
-        ctx.restore();
-        ctx.show_page();
+        ctx.restore().unwrap();
+        ctx.show_page().unwrap();
 
         let mut f: File = File::create("out.png").unwrap();
         surface.write_to_png(&mut f).expect("Unable to write PNG");

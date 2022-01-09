@@ -1,20 +1,20 @@
-use glib;
-use glib_sys::GError;
 use std::ffi::{CString, OsString};
 use std::{fs, path, ptr};
 
+use glib::translate::FromGlibPtrFull;
+
 pub fn call_with_gerror<T, F>(f: F) -> Result<*mut T, glib::error::Error>
 where
-    F: FnOnce(*mut *mut GError) -> *mut T,
+    F: FnOnce(*mut *mut glib::ffi::GError) -> *mut T,
 {
     // initialize error to a null-pointer
     let mut err = ptr::null_mut();
 
     // call the c-library function
-    let return_value = f(&mut err as *mut *mut GError);
+    let return_value = f(&mut err as *mut *mut glib::ffi::GError);
 
     if return_value.is_null() {
-        Err(glib::error::Error::wrap(err))
+        unsafe { Err(glib::error::Error::from_glib_full(err)) }
     } else {
         Ok(return_value)
     }

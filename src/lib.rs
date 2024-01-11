@@ -15,9 +15,14 @@ pub struct PopplerPage(*mut ffi::PopplerPage);
 impl PopplerDocument {
     pub fn new_from_file<P: AsRef<path::Path>>(
         p: P,
-        password: &str,
+        password: Option<&str>,
     ) -> Result<PopplerDocument, glib::error::Error> {
-        let pw = CString::new(password).map_err(|_| {
+        let pw = CString::new(if password.is_none() {
+            ""
+        } else {
+            password.expect("password.is_none() is false, but apparently it's lying.")
+        })
+        .map_err(|_| {
             glib::error::Error::new(
                 glib::FileError::Inval,
                 "Password invalid (possibly contains NUL characters)",
@@ -33,7 +38,7 @@ impl PopplerDocument {
     }
     pub fn new_from_data(
         data: &mut [u8],
-        password: &str,
+        password: Option<&str>,
     ) -> Result<PopplerDocument, glib::error::Error> {
         if data.is_empty() {
             return Err(glib::error::Error::new(
@@ -41,7 +46,12 @@ impl PopplerDocument {
                 "data is empty",
             ));
         }
-        let pw = CString::new(password).map_err(|_| {
+        let pw = CString::new(if password.is_none() {
+            ""
+        } else {
+            password.expect("password.is_none() is false, but apparently it's lying.")
+        })
+        .map_err(|_| {
             glib::error::Error::new(
                 glib::FileError::Inval,
                 "Password invalid (possibly contains NUL characters)",
@@ -123,11 +133,13 @@ impl PopplerPage {
         (width, height)
     }
 
+    #[cfg(feature = "render")]
     pub fn render(&self, ctx: &cairo::Context) {
         let ctx_raw = ctx.to_raw_none();
         unsafe { ffi::poppler_page_render(self.0, ctx_raw) }
     }
 
+    #[cfg(feature = "render")]
     pub fn render_for_printing(&self, ctx: &cairo::Context) {
         let ctx_raw = ctx.to_raw_none();
         unsafe { ffi::poppler_page_render_for_printing(self.0, ctx_raw) }
@@ -145,20 +157,25 @@ impl PopplerPage {
 mod tests {
     use crate::PopplerDocument;
     use crate::PopplerPage;
+    #[cfg(feature = "render")]
     use cairo::Context;
+    #[cfg(feature = "render")]
     use cairo::Format;
+    #[cfg(feature = "render")]
     use cairo::ImageSurface;
     use std::{fs::File, io::Read};
 
     #[test]
     fn test1() {
         let filename = "test.pdf";
-        let doc = PopplerDocument::new_from_file(filename, "").unwrap();
+        let doc = PopplerDocument::new_from_file(filename, None).unwrap();
         let num_pages = doc.get_n_pages();
 
         println!("Document has {} page(s)", num_pages);
 
+        #[cfg(feature = "render")]
         let surface = cairo::PdfSurface::new(420.0, 595.0, "output.pdf").unwrap();
+        #[cfg(feature = "render")]
         let ctx = Context::new(&surface).unwrap();
 
         // FIXME: move iterator to poppler
@@ -166,25 +183,30 @@ mod tests {
             let page = doc.get_page(page_num).unwrap();
             let (w, h) = page.get_size();
             println!("page {} has size {}, {}", page_num, w, h);
-            surface.set_size(w, h).unwrap();
-
-            ctx.save().unwrap();
-            page.render(&ctx);
+            #[cfg(feature = "render")]
+            (|page: &PopplerPage, ctx: &Context| {
+                surface.set_size(w, h).unwrap();
+                ctx.save().unwrap();
+                page.render(ctx);
+            })(&page, &ctx);
 
             println!("Text: {:?}", page.get_text().unwrap_or(""));
-
-            ctx.restore().unwrap();
-            ctx.show_page().unwrap();
+            #[cfg(feature = "render")]
+            (|ctx: &Context| {
+                ctx.restore().unwrap();
+                ctx.show_page().unwrap();
+            })(&ctx);
         }
         // g_object_unref (page);
         //surface.write_to_png("file.png");
+        #[cfg(feature = "render")]
         surface.finish();
     }
 
     #[test]
     fn test2_from_file() {
         let path = "test.pdf";
-        let doc: PopplerDocument = PopplerDocument::new_from_file(path, "upw").unwrap();
+        let doc: PopplerDocument = PopplerDocument::new_from_file(path, Some("upw")).unwrap();
         let num_pages = doc.get_n_pages();
         let title = doc.get_title().unwrap();
         let metadata = doc.get_metadata();
@@ -208,15 +230,22 @@ mod tests {
 
         assert_eq!(title, "This is a test PDF file");
 
+        #[cfg(feature = "render")]
         let surface = ImageSurface::create(Format::ARgb32, w as i32, h as i32).unwrap();
+        #[cfg(feature = "render")]
         let ctx = Context::new(&surface).unwrap();
 
-        ctx.save().unwrap();
-        page.render(&ctx);
-        ctx.restore().unwrap();
-        ctx.show_page().unwrap();
+        #[cfg(feature = "render")]
+        (|page: &PopplerPage, ctx: &Context| {
+            ctx.save().unwrap();
+            page.render(ctx);
+            ctx.restore().unwrap();
+            ctx.show_page().unwrap();
+        })(&page, &ctx);
 
+        #[cfg(feature = "render")]
         let mut f: File = File::create("out.png").unwrap();
+        #[cfg(feature = "render")]
         surface.write_to_png(&mut f).expect("Unable to write PNG");
     }
     #[test]
@@ -225,7 +254,8 @@ mod tests {
         let mut file = File::open(path).unwrap();
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data).unwrap();
-        let doc: PopplerDocument = PopplerDocument::new_from_data(&mut data[..], "upw").unwrap();
+        let doc: PopplerDocument =
+            PopplerDocument::new_from_data(&mut data[..], Some("upw")).unwrap();
         let num_pages = doc.get_n_pages();
         let title = doc.get_title().unwrap();
         let metadata = doc.get_metadata();
@@ -252,6 +282,6 @@ mod tests {
     fn test3() {
         let mut data = vec![];
 
-        assert!(PopplerDocument::new_from_data(&mut data[..], "upw").is_err());
+        assert!(PopplerDocument::new_from_data(&mut data[..], Some("upw")).is_err());
     }
 }

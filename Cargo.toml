@@ -16,3 +16,4 @@ render = ["dep:cairo-rs"]
 [dependencies]
 cairo-rs = { version = "0.18.5", features = ["png", "pdf"], optional = true }
 glib = "0.18.5"
+gobject-sys = "0.15"

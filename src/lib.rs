@@ -125,6 +125,14 @@ impl PopplerDocument {
     }
 }
 
+impl Drop for PopplerDocument {
+    fn drop(&mut self) {
+        unsafe {
+            gobject_sys::g_object_unref(self.0 as *mut gobject_sys::GObject);
+        }
+    }
+}
+
 impl PopplerPage {
     pub fn get_size(&self) -> (f64, f64) {
         let mut width: f64 = 0.0;
@@ -182,6 +190,14 @@ impl<'a> Iterator for PagesIter<'a> {
     }
 }
 
+impl Drop for PopplerPage {
+    fn drop(&mut self) {
+        unsafe {
+            gobject_sys::g_object_unref(self.0 as *mut gobject_sys::GObject);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::PopplerDocument;
@@ -226,7 +242,6 @@ mod tests {
                 ctx.show_page().unwrap();
             })(&ctx);
         }
-        // g_object_unref (page);
         //surface.write_to_png("file.png");
         #[cfg(feature = "render")]
         surface.finish();

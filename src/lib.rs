@@ -1,6 +1,8 @@
+use crate::ffi::PopplerRectangle;
+use glib::ffi::gpointer;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::os::raw::{c_char, c_double, c_int};
+use std::os::raw::{c_char, c_double, c_int, c_uint};
 use std::path;
 
 mod ffi;
@@ -165,6 +167,35 @@ impl PopplerPage {
         match unsafe { ffi::poppler_page_get_text(self.0) } {
             ptr if ptr.is_null() => None,
             ptr => unsafe { Some(CStr::from_ptr(ptr).to_str().unwrap_or_default()) },
+        }
+    }
+
+    pub fn get_text_boxes(&self) -> Option<Vec<String>> {
+        unsafe {
+            let mut rectangles = ffi::poppler_rectangle_new();
+            let mut n_rectangles: c_uint = 0;
+            let text_layout = ffi::poppler_page_get_text_layout(
+                self.0,
+                &mut rectangles as *mut *mut PopplerRectangle,
+                &mut n_rectangles as *mut c_uint,
+            );
+            if text_layout.eq(&0) {
+                return None;
+            }
+            let rectangles_slice: &mut [PopplerRectangle] =
+                std::slice::from_raw_parts_mut(rectangles, n_rectangles as usize);
+            let mut text_boxes = Vec::with_capacity(n_rectangles as usize);
+            for rect in rectangles_slice.iter_mut() {
+                let ptr = ffi::poppler_page_get_text_for_area(self.0, rect as *mut PopplerRectangle);
+                if ptr.is_null() {
+                    continue;
+                }
+                let text = CStr::from_ptr(ptr).to_str().unwrap_or_default();
+                text_boxes.push(text.to_string());
+                ffi::g_free(ptr as gpointer);
+            }
+            ffi::poppler_rectangle_free(rectangles);
+            Some(text_boxes)
         }
     }
 }

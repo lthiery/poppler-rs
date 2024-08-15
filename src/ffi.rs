@@ -1,3 +1,4 @@
+pub use glib::ffi::{g_free, gboolean};
 use std::os::raw::{c_char, c_double, c_int, c_uint};
 
 // FIXME: is this the correct way to get opaque types?
@@ -6,6 +7,7 @@ use std::os::raw::{c_char, c_double, c_int, c_uint};
 // NOTE: ask F/O about this
 pub enum PopplerDocument {}
 pub enum PopplerPage {}
+pub enum PopplerRectangle {}
 
 // FIXME: *const instead of mut pointers?
 
@@ -49,4 +51,19 @@ extern "C" {
     );
 
     pub fn poppler_page_get_text(page: *mut PopplerPage) -> *mut c_char;
+
+    pub fn poppler_rectangle_new() -> *mut PopplerRectangle;
+
+    pub fn poppler_rectangle_free(rectangle: *mut PopplerRectangle);
+
+    pub fn poppler_page_get_text_layout(
+        page: *mut PopplerPage,
+        rectangles: *mut *mut PopplerRectangle,
+        n_rectangles: *mut c_uint,
+    ) -> gboolean;
+
+    pub fn poppler_page_get_text_for_area(
+        page: *mut PopplerPage,
+        area: *mut PopplerRectangle,
+    ) -> *mut c_char;
 }

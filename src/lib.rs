@@ -172,7 +172,7 @@ impl PopplerPage {
 
     pub fn get_text_boxes(&self) -> Option<Vec<String>> {
         unsafe {
-            let mut rectangles = ffi::poppler_rectangle_new();
+            let mut rectangles: *mut PopplerRectangle = std::ptr::null_mut();
             let mut n_rectangles: c_uint = 0;
             let text_layout = ffi::poppler_page_get_text_layout(
                 self.0,
@@ -183,18 +183,18 @@ impl PopplerPage {
                 return None;
             }
             let rectangles_slice: &mut [PopplerRectangle] =
-                std::slice::from_raw_parts_mut(rectangles, n_rectangles as usize);
+                std::slice::from_raw_parts_mut(rectangles as *mut PopplerRectangle, n_rectangles as usize);
             let mut text_boxes = Vec::with_capacity(n_rectangles as usize);
-            for rect in rectangles_slice.iter_mut() {
+            for (_offset, rect) in rectangles_slice.iter_mut().enumerate() {
                 let ptr = ffi::poppler_page_get_text_for_area(self.0, rect as *mut PopplerRectangle);
                 if ptr.is_null() {
                     continue;
                 }
+                //let ptr = ptr.wrapping_add(offset);
                 let text = CStr::from_ptr(ptr).to_str().unwrap_or_default();
                 text_boxes.push(text.to_string());
-                ffi::g_free(ptr as gpointer);
             }
-            ffi::poppler_rectangle_free(rectangles);
+            ffi::g_free(rectangles as gpointer);
             Some(text_boxes)
         }
     }

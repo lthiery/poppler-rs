@@ -7,7 +7,13 @@ use std::os::raw::{c_char, c_double, c_int, c_uint};
 // NOTE: ask F/O about this
 pub enum PopplerDocument {}
 pub enum PopplerPage {}
-pub enum PopplerRectangle {}
+#[repr(C)]
+pub struct PopplerRectangle {
+    pub x1: f64,
+    pub y1: f64,
+    pub x2: f64,
+    pub y2: f64,
+}
 
 // FIXME: *const instead of mut pointers?
 
@@ -51,10 +57,6 @@ extern "C" {
     );
 
     pub fn poppler_page_get_text(page: *mut PopplerPage) -> *mut c_char;
-
-    pub fn poppler_rectangle_new() -> *mut PopplerRectangle;
-
-    pub fn poppler_rectangle_free(rectangle: *mut PopplerRectangle);
 
     pub fn poppler_page_get_text_layout(
         page: *mut PopplerPage,
